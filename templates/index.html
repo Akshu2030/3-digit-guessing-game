@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3 Digit Guessing Game</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-box {
+            width: 430px;
+            max-width: 90%;
+            background: white;
+            padding: 35px;
+            border-radius: 25px;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+        }
+
+        .logo {
+            font-size: 55px;
+        }
+
+        h1 {
+            margin: 5px 0;
+            color: #333;
+            font-size: 30px;
+        }
+
+        .subtitle {
+            color: #777;
+            margin-bottom: 30px;
+        }
+
+        .player-card {
+            background: #f3f4ff;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .player-card h2 {
+            margin: 0;
+            color: #4f46e5;
+            font-size: 21px;
+        }
+
+        input {
+            width: 220px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            font-size: 25px;
+            text-align: center;
+            letter-spacing: 8px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #667eea;
+        }
+
+        button {
+            width: 220px;
+            padding: 14px;
+            margin-top: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #actionButton {
+            background: #667eea;
+            color: white;
+        }
+
+        #actionButton:hover {
+            background: #5568d9;
+        }
+
+        #restartButton {
+            background: #22c55e;
+            color: white;
+            display: none;
+        }
+
+        #result {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 12px;
+            background: #f8f8f8;
+            min-height: 45px;
+            font-size: 17px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .rules {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #777;
+            font-size: 13px;
+        }
+
+        @media (max-width: 500px) {
+
+            .game-box {
+                padding: 25px 15px;
+            }
+
+            h1 {
+                font-size: 25px;
+            }
+
+            input,
+            button {
+                width: 90%;
+            }
+        }
+    </style>
+</head>
+
+
+<body>
+
+<div class="game-box">
+
+    <div class="logo">🎯</div>
+
+    <h1>3 Digit Guessing Game</h1>
+
+    <p class="subtitle">
+        Think • Guess • Win 🏆
+    </p>
+
+
+    <div class="player-card">
+
+        <h2 id="title">
+            Player 1 - Set Your Secret Number
+        </h2>
+
+    </div>
+
+
+    <input
+        type="password"
+        id="numberInput"
+        maxlength="3"
+        placeholder="000"
+    >
+
+    <br>
+
+    <button
+        id="actionButton"
+        onclick="handleAction()">
+        Submit
+    </button>
+
+    <br>
+
+    <button
+        id="restartButton"
+        onclick="restartGame()">
+        🔄 New Game
+    </button>
+
+
+    <div id="result">
+        Game is ready! 🎮
+    </div>
+
+
+    <div class="rules">
+
+        <b>Game Rules</b>
+
+        <br><br>
+
+        Both players choose a secret 3-digit number.
+
+        <br>
+
+        Take turns guessing.
+
+        <br>
+
+        First player to guess correctly wins! 🏆
+
+    </div>
+
+</div>
+
+
+<script>
+
+let currentPlayer = 1;
+let gamePhase = "secret";
+
+
+function handleAction() {
+
+    let number =
+        document.getElementById("numberInput").value;
+
+
+    if (!/^\d{3}$/.test(number)) {
+
+        document.getElementById("result").innerText =
+            "❌ Please enter exactly 3 digits!";
+
+        return;
+    }
+
+
+    // SECRET NUMBER
+
+    if (gamePhase === "secret") {
+
+        fetch("/set_secret", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+
+                player: currentPlayer,
+                number: number
+
+            })
+
+        })
+
+        .then(response => response.json())
+
+        .then(data => {
+
+            document.getElementById("result").innerText =
+                data.message;
+
+            document.getElementById("numberInput").value = "";
+
+
+            if (data.next_player === 2) {
+
+                currentPlayer = 2;
+
+                document.getElementById("title").innerText =
+                    "Player 2 - Set Your Secret Number";
+
+            }
+
+
+            else if (data.next_player === 1) {
+
+                currentPlayer = 1;
+
+                gamePhase = "guess";
+
+                document.getElementById("title").innerText =
+                    "Player 1 - Guess Player 2's Number";
+
+                document.getElementById("actionButton").innerText =
+                    "🎯 Guess";
+
+                document.getElementById("numberInput").type =
+                    "text";
+
+            }
+
+        });
+
+    }
+
+
+    // GUESS
+
+    else if (gamePhase === "guess") {
+
+        fetch("/guess", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+
+                player: currentPlayer,
+                guess: number
+
+            })
+
+        })
+
+        .then(response => response.json())
+
+        .then(data => {
+
+            document.getElementById("result").innerText =
+                data.message;
+
+            document.getElementById("numberInput").value = "";
+
+
+            // WINNER
+
+            if (data.correct === true) {
+
+                document.getElementById("title").innerText =
+                    "🏆 Player " + currentPlayer + " Wins!";
+
+                document.getElementById("actionButton").style.display =
+                    "none";
+
+                document.getElementById("numberInput").style.display =
+                    "none";
+
+                document.getElementById("restartButton").style.display =
+                    "inline-block";
+
+                return;
+            }
+
+
+            // CHANGE PLAYER
+
+            if (currentPlayer === 1) {
+
+                currentPlayer = 2;
+
+                document.getElementById("title").innerText =
+                    "Player 2 - Guess Player 1's Number";
+
+            }
+
+            else {
+
+                currentPlayer = 1;
+
+                document.getElementById("title").innerText =
+                    "Player 1 - Guess Player 2's Number";
+
+            }
+
+        });
+
+    }
+
+}
+
+
+// NEW GAME
+
+function restartGame() {
+
+    fetch("/restart", {
+
+        method: "POST"
+
+    })
+
+    .then(response => response.json())
+
+    .then(data => {
+
+        currentPlayer = 1;
+
+        gamePhase = "secret";
+
+
+        document.getElementById("title").innerText =
+            "Player 1 - Set Your Secret Number";
+
+
+        document.getElementById("numberInput").value = "";
+
+        document.getElementById("numberInput").type =
+            "password";
+
+        document.getElementById("numberInput").style.display =
+            "inline-block";
+
+
+        document.getElementById("actionButton").innerText =
+            "Submit";
+
+        document.getElementById("actionButton").style.display =
+            "inline-block";
+
+
+        document.getElementById("restartButton").style.display =
+            "none";
+
+
+        document.getElementById("result").innerText =
+            "🔄 New game started!";
+
+    });
+
+}
+
+</script>
+
+</body>
+</html>
