@@ -1,6 +1,15 @@
 # 3-Digit Guessing Game
 
-A simple number guessing game built with Python (Flask).
+A two-player number guessing game built with Python (Flask).
+
+## Features
+
+- Both players set a secret 3-digit number
+- Players take turns guessing each other's number
+- Hints show correct digits, correct positions and wrong positions
+- 15-second timer for every turn
+- If time runs out, the AI plays for the player
+- Attempt count is shown when the game ends
 
 ## How to run
 
