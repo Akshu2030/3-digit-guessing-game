@@ -1,9 +1,31 @@
 from flask import Flask, render_template, request, jsonify
 import random
+
 app = Flask(__name__)
 
 player1_secret = ""
 player2_secret = ""
+
+# Guess history for each player: (guess, correct_numbers, correct_position)
+history = {1: [], 2: []}
+
+
+def get_feedback(guess, secret):
+    """Returns (correct_numbers, correct_position) for a guess."""
+
+    correct_position = 0
+
+    for i in range(3):
+        if guess[i] == secret[i]:
+            correct_position += 1
+
+    correct_numbers = 0
+
+    for digit in set(guess):
+        if digit in secret:
+            correct_numbers += 1
+
+    return correct_numbers, correct_position
 
 
 # Home page
@@ -23,13 +45,11 @@ def set_secret():
     player = data.get("player")
     number = data.get("number")
 
-    # Check number
     if not number or len(number) != 3 or not number.isdigit():
         return jsonify({
             "message": "❌ Please enter exactly 3 digits."
         })
 
-    # Player 1 secret
     if player == 1:
 
         player1_secret = number
@@ -39,7 +59,6 @@ def set_secret():
             "next_player": 2
         })
 
-    # Player 2 secret
     elif player == 2:
 
         player2_secret = number
@@ -69,11 +88,9 @@ def check_guess():
             "correct": False
         })
 
-    # Player 1 guesses Player 2
     if player == 1:
         secret = player2_secret
 
-    # Player 2 guesses Player 1
     elif player == 2:
         secret = player1_secret
 
@@ -83,7 +100,6 @@ def check_guess():
             "correct": False
         })
 
-    # Exact answer
     if guess == secret:
 
         return jsonify({
@@ -91,25 +107,13 @@ def check_guess():
             "correct": True
         })
 
-    # Correct position
-    correct_position = 0
+    correct_numbers, correct_position = get_feedback(guess, secret)
 
-    for i in range(3):
-
-        if guess[i] == secret[i]:
-            correct_position += 1
-
-    # Correct numbers
-    correct_numbers = 0
-
-    for digit in set(guess):
-
-        if digit in secret:
-            correct_numbers += 1
+    # Save this guess so the AI can learn from it
+    history[player].append((guess, correct_numbers, correct_position))
 
     wrong_position = correct_numbers - correct_position
 
-    # Result
     if correct_numbers == 0:
 
         message = "❌ No number is correct."
@@ -138,15 +142,44 @@ def check_guess():
         "message": message,
         "correct": False
     })
-# AI guess (used when the player's time is over)
+
+
+# Smart AI guess (used when the player's time is over)
 @app.route("/ai_guess", methods=["POST"])
 def ai_guess():
 
-    guess = str(random.randint(0, 999)).zfill(3)
+    data = request.get_json(silent=True) or {}
+
+    player = data.get("player")
+
+    past = history.get(player, [])
+
+    candidates = []
+
+    for n in range(1000):
+
+        candidate = str(n).zfill(3)
+
+        possible = True
+
+        for old_guess, old_numbers, old_position in past:
+
+            # Candidate must give the same hints as the real secret gave
+            if candidate == old_guess or \
+               get_feedback(old_guess, candidate) != (old_numbers, old_position):
+                possible = False
+                break
+
+        if possible:
+            candidates.append(candidate)
+
+    if not candidates:
+        candidates = [str(random.randint(0, 999)).zfill(3)]
 
     return jsonify({
-        "guess": guess
+        "guess": random.choice(candidates)
     })
+
 
 # Restart game
 @app.route("/restart", methods=["POST"])
@@ -156,6 +189,9 @@ def restart():
 
     player1_secret = ""
     player2_secret = ""
+
+    history[1] = []
+    history[2] = []
 
     return jsonify({
         "message": "🔄 New game started!"

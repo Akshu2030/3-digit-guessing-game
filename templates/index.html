@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -56,6 +57,13 @@
             font-size: 21px;
         }
 
+        #timer {
+            margin-bottom: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #e11d48;
+        }
+
         input {
             width: 220px;
             padding: 15px;
@@ -106,6 +114,7 @@
             font-size: 17px;
             font-weight: bold;
             color: #333;
+            white-space: pre-line;
         }
 
         .rules {
@@ -115,12 +124,7 @@
             color: #777;
             font-size: 13px;
         }
-#timer {
-    margin-bottom: 15px;
-    font-size: 20px;
-    font-weight: bold;
-    color: #e11d48;
-}
+
         @media (max-width: 500px) {
 
             .game-box {
@@ -154,13 +158,14 @@
 
 
     <div class="player-card">
-
         <h2 id="title">
             Player 1 - Set Your Secret Number
         </h2>
-
     </div>
-<div id="timer">⏱️ Time left: --</div>
+
+
+    <div id="timer">⏱️ Time left: --</div>
+
 
     <input
         type="password"
@@ -201,7 +206,11 @@
 
         <br>
 
-        Take turns guessing.
+        Take turns guessing. You get 15 seconds per turn.
+
+        <br>
+
+        If time runs out, the AI plays for you.
 
         <br>
 
@@ -213,6 +222,7 @@
 
 
 <script>
+
 const TIME_LIMIT = 15;   // seconds per turn (change here if needed)
 
 let currentPlayer = 1;
@@ -255,7 +265,11 @@ function updateTimerText() {
 
 // Time over: AI plays for the player
 function autoPlay() {
-    fetch("/ai_guess", { method: "POST" })
+    fetch("/ai_guess", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player: currentPlayer })
+    })
     .then(response => response.json())
     .then(data => {
         if (gamePhase === "secret") {
