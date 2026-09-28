@@ -115,7 +115,12 @@
             color: #777;
             font-size: 13px;
         }
-
+#timer {
+    margin-bottom: 15px;
+    font-size: 20px;
+    font-weight: bold;
+    color: #e11d48;
+}
         @media (max-width: 500px) {
 
             .game-box {
@@ -155,7 +160,7 @@
         </h2>
 
     </div>
-
+<div id="timer">⏱️ Time left: --</div>
 
     <input
         type="password"
@@ -208,24 +213,77 @@
 
 
 <script>
+const TIME_LIMIT = 15;   // seconds per turn (change here if needed)
 
 let currentPlayer = 1;
 let gamePhase = "secret";
+let attempts = { 1: 0, 2: 0 };
+let timeLeft = TIME_LIMIT;
+let timerId = null;
+let autoPrefix = "";
 
+
+// ---------- TIMER ----------
+
+function startTimer() {
+    stopTimer();
+    timeLeft = TIME_LIMIT;
+    updateTimerText();
+
+    timerId = setInterval(function () {
+        timeLeft--;
+        updateTimerText();
+
+        if (timeLeft <= 0) {
+            stopTimer();
+            autoPlay();
+        }
+    }, 1000);
+}
+
+function stopTimer() {
+    if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+    }
+}
+
+function updateTimerText() {
+    document.getElementById("timer").innerText =
+        "⏱️ Player " + currentPlayer + " time left: " + timeLeft + "s";
+}
+
+// Time over: AI plays for the player
+function autoPlay() {
+    fetch("/ai_guess", { method: "POST" })
+    .then(response => response.json())
+    .then(data => {
+        if (gamePhase === "secret") {
+            autoPrefix = "⏰ Time up! Random secret number set for Player "
+                + currentPlayer + ".\n";
+        } else {
+            autoPrefix = "⏰ Time up! AI guessed " + data.guess + " for Player "
+                + currentPlayer + ".\n";
+        }
+        document.getElementById("numberInput").value = data.guess;
+        handleAction();
+    });
+}
+
+
+// ---------- MAIN ACTION ----------
 
 function handleAction() {
 
-    let number =
-        document.getElementById("numberInput").value;
-
+    let number = document.getElementById("numberInput").value;
 
     if (!/^\d{3}$/.test(number)) {
-
         document.getElementById("result").innerText =
             "❌ Please enter exactly 3 digits!";
-
         return;
     }
+
+    stopTimer();
 
 
     // SECRET NUMBER
@@ -233,31 +291,21 @@ function handleAction() {
     if (gamePhase === "secret") {
 
         fetch("/set_secret", {
-
             method: "POST",
-
-            headers: {
-                "Content-Type": "application/json"
-            },
-
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-
                 player: currentPlayer,
                 number: number
-
             })
-
         })
-
         .then(response => response.json())
-
         .then(data => {
 
             document.getElementById("result").innerText =
-                data.message;
+                autoPrefix + data.message;
+            autoPrefix = "";
 
             document.getElementById("numberInput").value = "";
-
 
             if (data.next_player === 2) {
 
@@ -266,28 +314,28 @@ function handleAction() {
                 document.getElementById("title").innerText =
                     "Player 2 - Set Your Secret Number";
 
+                startTimer();
             }
-
 
             else if (data.next_player === 1) {
 
                 currentPlayer = 1;
-
                 gamePhase = "guess";
 
                 document.getElementById("title").innerText =
                     "Player 1 - Guess Player 2's Number";
 
-                document.getElementById("actionButton").innerText =
-                    "🎯 Guess";
+                document.getElementById("actionButton").innerText = "🎯 Guess";
+                document.getElementById("numberInput").type = "text";
 
-                document.getElementById("numberInput").type =
-                    "text";
-
+                startTimer();
             }
 
+            else {
+                // error from server: give the same player another chance
+                startTimer();
+            }
         });
-
     }
 
 
@@ -296,28 +344,21 @@ function handleAction() {
     else if (gamePhase === "guess") {
 
         fetch("/guess", {
-
             method: "POST",
-
-            headers: {
-                "Content-Type": "application/json"
-            },
-
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-
                 player: currentPlayer,
                 guess: number
-
             })
-
         })
-
         .then(response => response.json())
-
         .then(data => {
 
+            attempts[currentPlayer]++;
+
             document.getElementById("result").innerText =
-                data.message;
+                autoPrefix + data.message;
+            autoPrefix = "";
 
             document.getElementById("numberInput").value = "";
 
@@ -329,12 +370,18 @@ function handleAction() {
                 document.getElementById("title").innerText =
                     "🏆 Player " + currentPlayer + " Wins!";
 
-                document.getElementById("actionButton").style.display =
-                    "none";
+                document.getElementById("timer").innerText =
+                    "🏁 Game finished";
 
-                document.getElementById("numberInput").style.display =
-                    "none";
+                document.getElementById("result").innerText =
+                    data.message + "\n" +
+                    "Player " + currentPlayer + " won in " +
+                    attempts[currentPlayer] + " attempt(s)!\n" +
+                    "Attempts → Player 1: " + attempts[1] +
+                    " | Player 2: " + attempts[2];
 
+                document.getElementById("actionButton").style.display = "none";
+                document.getElementById("numberInput").style.display = "none";
                 document.getElementById("restartButton").style.display =
                     "inline-block";
 
@@ -345,79 +392,57 @@ function handleAction() {
             // CHANGE PLAYER
 
             if (currentPlayer === 1) {
-
                 currentPlayer = 2;
-
                 document.getElementById("title").innerText =
                     "Player 2 - Guess Player 1's Number";
-
             }
-
             else {
-
                 currentPlayer = 1;
-
                 document.getElementById("title").innerText =
                     "Player 1 - Guess Player 2's Number";
-
             }
 
+            startTimer();
         });
-
     }
-
 }
 
 
-// NEW GAME
+// ---------- NEW GAME ----------
 
 function restartGame() {
 
-    fetch("/restart", {
+    stopTimer();
 
-        method: "POST"
-
-    })
-
+    fetch("/restart", { method: "POST" })
     .then(response => response.json())
-
     .then(data => {
 
         currentPlayer = 1;
-
         gamePhase = "secret";
-
+        attempts = { 1: 0, 2: 0 };
+        autoPrefix = "";
 
         document.getElementById("title").innerText =
             "Player 1 - Set Your Secret Number";
 
-
         document.getElementById("numberInput").value = "";
+        document.getElementById("numberInput").type = "password";
+        document.getElementById("numberInput").style.display = "inline-block";
 
-        document.getElementById("numberInput").type =
-            "password";
+        document.getElementById("actionButton").innerText = "Submit";
+        document.getElementById("actionButton").style.display = "inline-block";
+        document.getElementById("restartButton").style.display = "none";
 
-        document.getElementById("numberInput").style.display =
-            "inline-block";
+        document.getElementById("result").innerText = "🔄 New game started!";
 
-
-        document.getElementById("actionButton").innerText =
-            "Submit";
-
-        document.getElementById("actionButton").style.display =
-            "inline-block";
-
-
-        document.getElementById("restartButton").style.display =
-            "none";
-
-
-        document.getElementById("result").innerText =
-            "🔄 New game started!";
-
+        startTimer();
     });
-
 }
+
+
+// Start the timer for Player 1's secret number when the page loads
+startTimer();
 
 </script>
 

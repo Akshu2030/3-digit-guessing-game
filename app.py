@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-
+import random
 app = Flask(__name__)
 
 player1_secret = ""
@@ -138,7 +138,15 @@ def check_guess():
         "message": message,
         "correct": False
     })
+# AI guess (used when the player's time is over)
+@app.route("/ai_guess", methods=["POST"])
+def ai_guess():
 
+    guess = str(random.randint(0, 999)).zfill(3)
+
+    return jsonify({
+        "guess": guess
+    })
 
 # Restart game
 @app.route("/restart", methods=["POST"])
